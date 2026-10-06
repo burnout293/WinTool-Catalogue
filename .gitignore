@@ -1,0 +1,4 @@
+# Ce que produit une construction locale de l'index : seule la CI publie.
+publication/
+index.json
+index.json.sig

@@ -1,0 +1,110 @@
+# Publication d'une version du catalogue.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# Valide les scripts, construit index.json depuis les fichiers memes qui seront
+# publies, le signe, et cree une release EN BROUILLON. Publier le brouillon,
+# c'est livrer : chaque installation de WinTool la proposera au demarrage.
+#
+# Les versions ne reculent jamais : WinTool refuse un catalogue plus ancien que
+# celui qu'il a installe.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# Necessaire pour creer la release.
+permissions:
+  contents: write
+
+env:
+  WINTOOL_REPO: burnout293/WinTool
+
+jobs:
+  publier:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: catalogue
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.WINTOOL_REPO }}
+          path: wintool
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      # La CLI Tauri signe au format que WinTool verifie. Installee depuis le
+      # package-lock de WinTool : la meme version que celle qui signe ses
+      # mises a jour.
+      - name: Installer l'outil de signature
+        working-directory: wintool
+        run: npm ci
+
+      # Les secrets sont-ils la, bien formes, et conformes a la cle publique
+      # compilee dans WinTool (src-tauri/catalogue.pub) ? Sinon on s'arrete ici
+      # plutot que de publier un index que chaque installation refuserait.
+      # Chaque echec sort en annotation, lisible sans fouiller le journal.
+      - name: Verifier la cle de signature
+        working-directory: wintool
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./tools/verifier-cle-signature.ps1 -ClePublique src-tauri/catalogue.pub
+
+      - name: Valider les scripts
+        shell: pwsh
+        run: ./wintool/tools/lint-scripts.ps1 -Path ./catalogue/scripts -Strict
+
+      # L'index se construit depuis le dossier de publication, pas depuis le
+      # depot : ses empreintes portent sur les octets exacts qui seront mis en
+      # ligne.
+      - name: Construire l'index
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag -replace '^v', ''
+          New-Item -ItemType Directory -Force publication | Out-Null
+          Copy-Item catalogue/scripts/*.ps1 publication/
+          ./wintool/tools/construire-index-catalogue.ps1 -Scripts publication -Version $version -Tag $tag -Sortie publication/index.json
+
+      # La cle et son mot de passe arrivent par GITHUB_ENV, ecrits par l'etape
+      # « Verifier la cle de signature » apres nettoyage. NE PAS remettre ici
+      # les secrets bruts : ils ecraseraient les valeurs nettoyees (c'est ainsi
+      # qu'a echoue la release 1.1.0 de WinTool).
+      - name: Signer l'index
+        working-directory: wintool
+        shell: pwsh
+        run: |
+          npx tauri signer sign ../publication/index.json
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path ../publication/index.json.sig)) {
+            Write-Host '::error title=Signature impossible::tauri signer n''a pas produit index.json.sig.'
+            exit 1
+          }
+
+      - name: Creer la release en brouillon
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $notes = @"
+          Catalogue officiel de scripts pour [WinTool](https://github.com/${{ env.WINTOOL_REPO }}).
+
+          WinTool installe et met a jour ce catalogue lui-meme : il n'y a rien a telecharger a la main.
+          Chaque script est verifie avant d'etre ecrit, contre ``index.json``, dont la signature
+          (``index.json.sig``) est controlee avec une cle compilee dans l'application.
+
+          Scripts sous licence MIT. Ils ne font pas partie de WinTool et ne relevent pas de sa licence.
+          "@
+          $fichiers = (Get-ChildItem publication).FullName
+          gh release create $tag @fichiers --repo '${{ github.repository }}' --draft --title "Catalogue $tag" --notes $notes
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $n = (Get-ChildItem publication -Filter *.ps1).Count
+          Write-Host "::notice title=Brouillon cree::Catalogue $tag : $n scripts, index signe. A publier sur https://github.com/${{ github.repository }}/releases"

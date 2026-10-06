@@ -1,0 +1,46 @@
+# Verification a chaque poussee : les scripts passent le validateur de WinTool,
+# et l'index se construit. Rien n'est signe ni publie ici.
+#
+# Tout tourne sous Windows : le validateur et l'outil d'index sont des scripts
+# PowerShell, et les empreintes portent sur des fichiers extraits en CRLF.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Le depot de l'application : il porte le validateur, l'outil d'index et la
+  # cle publique du catalogue. Un fork le remplace ici, et dans release.yml.
+  WINTOOL_REPO: burnout293/WinTool
+
+jobs:
+  verifier:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: catalogue
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.WINTOOL_REPO }}
+          path: wintool
+
+      # Le meme validateur, en mode strict, que celui de WinTool : un script du
+      # catalogue officiel est conforme a 100 %, sans exception.
+      - name: Valider les scripts
+        shell: pwsh
+        run: ./wintool/tools/lint-scripts.ps1 -Path ./catalogue/scripts -Strict
+
+      # Un nom de fichier refuse, un id manquant ou en double se voient ici,
+      # pas le jour de la publication.
+      - name: Construire l'index (essai)
+        shell: pwsh
+        run: ./wintool/tools/construire-index-catalogue.ps1 -Scripts ./catalogue/scripts -Version 0.0.0 -Sortie index-essai.json

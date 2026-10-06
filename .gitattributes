@@ -1,0 +1,7 @@
+# Les scripts s'ecrivent en CRLF, avec BOM (format v2 de WinTool). Leur
+# empreinte, publiee dans l'index signe, porte sur ces octets exacts : une
+# conversion de fins de ligne entre la construction de l'index et la
+# publication ferait refuser tout le catalogue par chaque installation.
+*.ps1  text eol=crlf
+*.md   text eol=lf
+*.yml  text eol=lf
