@@ -124,3 +124,29 @@ qui vit dans WinTool, à côté du code qui le lit.
 
 Un fork remplace, dans WinTool, la constante `DEPOT` et `src-tauri/catalogue.pub`
 (`src-tauri/src/catalogue.rs`) ; dans ce dépôt, `WINTOOL_REPO` dans les deux workflows.
+
+## Publier votre propre catalogue
+
+Depuis WinTool 1.4, un utilisateur peut ajouter d'autres catalogues que celui-ci
+(**Réglages → Catalogues → Ajouter un catalogue**) : il colle l'adresse d'un dépôt GitHub et
+la **clé publique** de son éditeur. Pour en publier un :
+
+1. **Partez de ce dépôt** (licence MIT) ou d'un dépôt neuf contenant vos scripts, conformes à
+   [`FORMAT_SCRIPT.md`](https://github.com/burnout293/WinTool/blob/main/docs/FORMAT_SCRIPT.md).
+2. **Générez votre propre paire de clés** — `npx tauri signer generate -w catalogue.key`, ou
+   `minisign -G`. La clé privée ne va jamais dans le dépôt ; tout au plus dans un secret
+   chiffré des Actions.
+3. **Choisissez un identifiant de source** : minuscules, chiffres et tirets, 40 au plus
+   (`dupont-scripts`), et pas `officiel`. Construisez l'index avec
+   `construire-index-catalogue.ps1 -Source dupont-scripts`. Il ne doit plus changer : c'est
+   lui que WinTool retient.
+4. **Signez `index.json`** et publiez une release qui contient `index.json`, sa signature
+   `index.json.sig` (`.sig` de `tauri signer` ou `.minisig` de `minisign` renommé) et les
+   scripts.
+5. **Affichez votre clé publique dans votre README** — le fichier `.pub` ou sa ligne `RW…`.
+   C'est elle que vos utilisateurs colleront.
+
+WinTool vérifie chaque index avec cette clé avant de le lire. Les actions d'un catalogue
+tiers ne sont **jamais approuvées d'office** : chacune demande l'accord de l'utilisateur
+avant sa première exécution, et WinTool affiche qu'elle n'est ni contrôlée ni approuvée par
+le projet WinTool.
