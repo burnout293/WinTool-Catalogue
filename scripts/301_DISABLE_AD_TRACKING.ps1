@@ -6,18 +6,19 @@
 ## category      : privacy
 ## icon          : eye-off
 ## tags          : advertising id, ads, tracking, suggestions, tailored experiences
-## version       : 2.0
+## version       : 2.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode          : [select] Action — turn the checked items off or on
+## Mode          : [select] [scan] Action — turn the checked items off or on
 ##   disable     : Turn the checked items off
 ##   enable      : Turn the checked items on
 ## Items         : [multi]  What to disable — pick one or more
@@ -75,6 +76,25 @@ $Definitions = @{
     tailored = @{ Label = 'Tailored experiences'; Values = @(
         @{ Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy'; Name = 'TailoredExperiencesWithDiagnosticDataEnabled'; Off = 0; Default = 1 }
     ) }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Pour chaque element, state=ok si
+# toutes ses valeurs sont deja a la cible du Mode choisi, sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('adid', 'apptracking', 'tailored')) {
+        $done = $true
+        foreach ($v in $Definitions[$key].Values) {
+            $wanted  = if ($Restore) { $v.Default } else { $v.Off }
+            $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($null -eq $current -or [int]$current -ne $wanted) { $done = $false }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

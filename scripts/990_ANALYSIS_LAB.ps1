@@ -6,11 +6,11 @@
 ## category      : tools
 ## icon          : flask-conical
 ## tags          : lab, test, analysis, views, demo, sandbox
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

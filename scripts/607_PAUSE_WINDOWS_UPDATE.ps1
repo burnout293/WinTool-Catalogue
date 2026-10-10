@@ -6,11 +6,11 @@
 ## category      : tools
 ## icon          : calendar-clock
 ## tags          : windows update, pause, defer, updates
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

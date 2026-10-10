@@ -6,7 +6,7 @@
 ## category      : cleaning
 ## icon          : trash-2
 ## tags          : recycle bin, trash, disk space
-## version       : 2.1
+## version       : 2.2
 ## admin         : false
 ## risk          : medium
 ## duration      : fast

@@ -6,25 +6,26 @@
 ## category      : customize
 ## icon          : keyboard
 ## tags          : sticky keys, filter keys, toggle keys, accessibility, prompt
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode         : [select] Action — turn the checked items off or on
+## Mode         : [select] [scan] Action — turn the checked items off or on
 ##   disable    : Turn the checked items off
 ##   enable     : Turn the checked items on — the Windows defaults
 ## Items        : [multi]  Which shortcuts to disable — pick one or more
 ##   sticky     : Sticky Keys — the prompt after pressing Shift five times
 ##   filter     : Filter Keys — the prompt after holding right Shift for 8 seconds
 ##   toggle     : Toggle Keys — the prompt after holding Num Lock for 5 seconds
-## FullyDisable : [bool]   Also disable the feature itself — not just the shortcut and prompt
+## FullyDisable : [bool] [scan] Also disable the feature itself — not just the shortcut and prompt
 ## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -73,6 +74,22 @@ $Definitions = @{
     sticky = @{ Label = 'Sticky Keys'; Path = 'HKCU:\Control Panel\Accessibility\StickyKeys';       Default = '510'; Shortcut = '506'; Full = '504' }
     filter = @{ Label = 'Filter Keys'; Path = 'HKCU:\Control Panel\Accessibility\Keyboard Response'; Default = '126'; Shortcut = '122'; Full = '120' }
     toggle = @{ Label = 'Toggle Keys'; Path = 'HKCU:\Control Panel\Accessibility\ToggleKeys';        Default = '62';  Shortcut = '58';  Full = '56'  }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Pour chaque element, state=ok si
+# Flags est deja a la cible du Mode (et de FullyDisable), sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('sticky', 'filter', 'toggle')) {
+        $def = $Definitions[$key]
+        if ($Disable) { if ($Full) { $wanted = $def.Full } else { $wanted = $def.Shortcut } } else { $wanted = $def.Default }
+        $current = (Get-ItemProperty -Path $def.Path -Name 'Flags' -ErrorAction SilentlyContinue).Flags
+        $state = if ("$current" -eq "$wanted") { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

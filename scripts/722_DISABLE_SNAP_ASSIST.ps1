@@ -6,18 +6,19 @@
 ## category      : customize
 ## icon          : layout-grid
 ## tags          : snap, snap assist, layouts, windows, docking
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode            : [select] Action — turn the checked items off or on
+## Mode            : [select] [scan] Action — turn the checked items off or on
 ##   disable       : Turn the checked items off
 ##   enable        : Turn the checked items on — the Windows defaults
 ## Items           : [multi]  What to turn off — pick one or more
@@ -84,6 +85,22 @@ $Definitions = @{
     fill        = @{ Label = 'Auto-fill'; Path = $adv; Name = 'SnapFill';                       Type = 'DWord';  Off = 0;   Default = 1 }
     jointresize = @{ Label = 'Joint resize'; Path = $adv; Name = 'JointResize';                 Type = 'DWord';  Off = 0;   Default = 1 }
     allsnap     = @{ Label = 'All snapping'; Path = $dsk; Name = 'WindowArrangementActive';     Type = 'String'; Off = '0'; Default = '1' }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Pour chaque element, state=ok si
+# la valeur est deja a la cible du Mode choisi, sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('assist', 'flyout', 'bar', 'fill', 'jointresize', 'allsnap')) {
+        $def = $Definitions[$key]
+        if ($Disable) { $wanted = $def.Off } else { $wanted = $def.Default }
+        $current = (Get-ItemProperty -Path $def.Path -Name $def.Name -ErrorAction SilentlyContinue).($def.Name)
+        $state = if ($null -ne $current -and "$current" -eq "$wanted") { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

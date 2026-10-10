@@ -5,19 +5,20 @@
 ## desc          : Turns the number pad on automatically at the sign-in screen and after login
 ## category      : customize
 ## icon          : keyboard
-## tags          : num lock, numlock, keyboard, startup, boot, login
-## version       : 1.0
+## tags          : num lock, numlock, keyboard, startup, boot, login, restart required, redémarrage
+## version       : 1.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode              : [select] Action — turn Num Lock at startup on or off
+## Mode              : [select] [scan] Action — turn Num Lock at startup on or off
 ##   enable          : Turn Num Lock on at startup
 ##   disable         : Do not force Num Lock at startup — the Windows default
 ## Scopes            : [multi]  Where to apply — pick one or more
@@ -85,6 +86,20 @@ function Set-Indicator {
         Set-ItemProperty -Path $Path -Name 'InitialKeyboardIndicators' -Value "$wanted" -Type String -ErrorAction Stop
         Write-Host "[OK]   $($Label): set to $wanted"
     } catch { Write-Host "[ERR]  $($Label): $($_.Exception.Message)"; $script:errors++ }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Pour chaque portee, state=ok si
+# InitialKeyboardIndicators vaut deja la cible du Mode choisi, sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('signin', 'currentuser')) {
+        $cur = (Get-ItemProperty -Path $scopeDefs[$key].Path -Name 'InitialKeyboardIndicators' -ErrorAction SilentlyContinue).InitialKeyboardIndicators
+        $state = if ("$cur" -eq "$wanted") { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Scopes.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

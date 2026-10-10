@@ -6,14 +6,15 @@
 ## category      : customize
 ## icon          : layout-grid
 ## tags          : context menu, right-click, windows 11, classic, explorer
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
@@ -58,6 +59,22 @@ $SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
 $Classic  = ($CONFIG.Mode -ne 'modern')
 $key      = 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}'
 $inproc   = "$key\InprocServer32"
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Menu classique actif si la
+# sous-cle InprocServer32 existe. recommended = choix par defaut (classic).
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading the current menu"
+    $isClassic = Test-Path $inproc
+    foreach ($choice in @('classic', 'modern')) {
+        $isCurrent = if ($choice -eq 'classic') { $isClassic } else { -not $isClassic }
+        $cTxt = if ($isCurrent) { 'true' } else { 'false' }
+        $rTxt = if ($choice -eq 'classic') { 'true' } else { 'false' }
+        Write-Output "[FIND] Mode.$choice current=$cTxt recommended=$rTxt"
+    }
+    exit 0
+}
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - the setting is read, nothing is changed" }
 

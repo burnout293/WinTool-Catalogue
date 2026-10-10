@@ -6,18 +6,19 @@
 ## category      : privacy
 ## icon          : shield-check
 ## tags          : telemetry, browser, edge, chrome, firefox, brave, opera, policy
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode        : [select] Action — turn browser telemetry off or on
+## Mode        : [select] [scan] Action — turn browser telemetry off or on
 ##   disable   : Disable telemetry — reduce what browsers report
 ##   enable    : Enable telemetry — remove the policies, back to each browser's default
 ## Browsers    : [multi]  Browsers — pick one or more
@@ -102,6 +103,29 @@ $BrowserDefs = @{
         @{ Path = "$P\Opera Software\Opera"; Name = 'MetricsReportingEnabled'; Off = 0 },
         @{ Path = "$P\Google\Chrome"; Name = 'MetricsReportingEnabled'; Off = 0 }
     ) }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Pour chaque navigateur, state=ok
+# si toutes ses strategies sont a la cible du Mode : disable = valeur Off,
+# enable = valeur absente (le corps la supprime). Sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current policies"
+    foreach ($key in @('edge', 'chrome', 'firefox', 'brave', 'opera')) {
+        $done = $true
+        foreach ($v in $BrowserDefs[$key].Values) {
+            $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($Disable) {
+                if ($null -eq $current -or [int]$current -ne $v.Off) { $done = $false }
+            } else {
+                if ($null -ne $current) { $done = $false }
+            }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Browsers.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - policies are read, nothing is changed" }

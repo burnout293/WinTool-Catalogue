@@ -6,11 +6,11 @@
 ## category      : tools
 ## icon          : download
 ## tags          : browser, import, restore, bookmarks, migration, edge, chrome, firefox
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : high
 ## duration      : medium
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

@@ -6,11 +6,11 @@
 ## category      : tools
 ## icon          : upload
 ## tags          : browser, export, bookmarks, backup, migration, edge, chrome, firefox
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : medium
 ## duration      : medium
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

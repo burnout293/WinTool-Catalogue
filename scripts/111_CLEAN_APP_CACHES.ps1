@@ -6,7 +6,7 @@
 ## category      : cleaning
 ## icon          : eraser
 ## tags          : cache, discord, teams, spotify, slack, nvidia, adobe, disk space
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : medium
@@ -14,6 +14,9 @@
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
+## view          : bars
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
@@ -29,9 +32,14 @@
 ##   steam      : Steam web cache
 ##   epic       : Epic Games Launcher web cache
 ##   onedrive   : OneDrive cache — not your files, only the temporary cache
-## CustomPaths  : [string] Extra cache folders — full paths separated by semicolons
+## CustomPaths  : [string] [scan] Extra cache folders — full paths separated by semicolons
 ## CloseApps    : [bool]   Close open apps — otherwise an open app is skipped
-## MinAgeHours  : [number] Minimum file age — in hours, newer files are kept
+## MinAge       : [select] [scan] Minimum file age — newer files are kept
+##   h0         : No minimum — every file
+##   h1         : Older than 1 hour
+##   h24        : Older than 1 day
+##   h48        : Older than 2 days
+##   h168       : Older than 1 week
 ## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -52,7 +60,12 @@
 ##   onedrive   : Cache OneDrive — pas vos fichiers, seulement le cache temporaire
 ## CustomPaths  : Dossiers de cache supplémentaires — chemins complets séparés par des points-virgules
 ## CloseApps    : Fermer les applications ouvertes — sinon une application ouverte est ignorée
-## MinAgeHours  : Ancienneté minimale — en heures, les fichiers plus récents sont conservés
+## MinAge       : Ancienneté minimale — les fichiers plus récents sont conservés
+##   h0         : Aucune — tous les fichiers
+##   h1         : Plus d'une heure
+##   h24        : Plus d'un jour
+##   h48        : Plus de 2 jours
+##   h168       : Plus d'une semaine
 ## SafeTest     : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
 
@@ -60,7 +73,7 @@ $CONFIG = @{
     Apps        = @("teams", "discord", "slack", "spotify", "vscode", "nvidia")
     CustomPaths = ""
     CloseApps   = $false
-    MinAgeHours = 0
+    MinAge      = "h0"
     SafeTest    = $false
 }
 
@@ -81,7 +94,11 @@ if ($env:WINTOOL_CONFIG) {
 
 $SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
 $freed    = [long]0
-$cutoff   = (Get-Date).AddHours(-[double]$CONFIG.MinAgeHours)
+# Correspondance des choix MinAge -> heures.
+$MinAgeMap = @{ h0 = 0; h1 = 1; h24 = 24; h48 = 48; h168 = 168 }
+$MinAgeHours = $MinAgeMap["$($CONFIG.MinAge)"]
+if ($null -eq $MinAgeHours) { $MinAgeHours = 0 }
+$cutoff   = (Get-Date).AddHours(-[double]$MinAgeHours)
 
 $LOCAL = $env:LOCALAPPDATA
 $ROAM  = $env:APPDATA
@@ -180,6 +197,39 @@ function Clear-CacheDir {
     return $done
 }
 
+# Mesure (analyse, lecture seule) : memes fichiers que Clear-CacheDir (seuil compris).
+function Measure-CacheDirs {
+    param($Dirs)
+    $size = [long]0; $count = 0
+    foreach ($d in $Dirs) {
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        $files = @(Get-ChildItem -LiteralPath $d -Recurse -Force -File -ErrorAction SilentlyContinue |
+                   Where-Object { $_.LastWriteTime -lt $cutoff })
+        $size  += [long](($files | Measure-Object -Property Length -Sum).Sum)
+        $count += $files.Count
+    }
+    [pscustomobject]@{ Size = $size; Count = $count }
+}
+
+# ==============================================================================
+# ANALYSE - on mesure, on ne supprime ni ne ferme RIEN
+# ==============================================================================
+
+if ($env:WINTOOL_MODE -eq 'scan') {
+    $order = @('teams', 'discord', 'slack', 'spotify', 'zoom', 'vscode', 'nvidia', 'adobe', 'steam', 'epic', 'onedrive')
+    $i = 0
+    foreach ($a in $order) {
+        $i++
+        Write-Output "[STEP] $i/$($order.Count) Measuring $a"
+        $existing = @($AppDefs[$a].Dirs | Where-Object { Test-Path -LiteralPath $_ })
+        # Application absente : aucun constat.
+        if ($existing.Count -eq 0) { continue }
+        $m = Measure-CacheDirs $existing
+        Write-Output "[FIND] Apps.$a size=$($m.Size) count=$($m.Count)"
+    }
+    exit 0
+}
+
 # ==============================================================================
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - caches are measured, nothing is closed or deleted" }
@@ -267,6 +317,7 @@ if ($SafeTest) {
     Write-Host "[DONE] SafeTest finished - nothing was deleted"
     exit 0
 }
+Write-Output "[FREED] $freed"
 Write-Host "[INFO] Total freed: $(Format-Size $freed)"
 Write-Host "[DONE] App caches cleared"
 exit 0

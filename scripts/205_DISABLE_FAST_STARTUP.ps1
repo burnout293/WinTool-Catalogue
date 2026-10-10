@@ -5,15 +5,16 @@
 ## desc          : Makes shutdown a real shutdown - fixes many update and driver issues
 ## category      : performance
 ## icon          : power
-## tags          : fast startup, hiberboot, shutdown, boot
-## version       : 2.0
+## tags          : fast startup, hiberboot, shutdown, boot, restart required, redémarrage
+## version       : 2.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
@@ -56,6 +57,24 @@ $regPath  = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
 $regName  = 'HiberbootEnabled'
 
 if ($CONFIG.Mode -eq 'enable') { $wanted = 1; $label = 'enabled' } else { $wanted = 0; $label = 'disabled' }
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Pour chaque choix de Mode :
+# current = reglage en place (absent = defaut Windows = active),
+# recommended = choix par defaut du script (disable).
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading the current state"
+    $cur = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+    $isEnabled = ($null -eq $cur -or [int]$cur -ne 0)
+    foreach ($choice in @('disable', 'enable')) {
+        $isCurrent = if ($choice -eq 'enable') { $isEnabled } else { -not $isEnabled }
+        $cTxt = if ($isCurrent) { 'true' } else { 'false' }
+        $rTxt = if ($choice -eq 'disable') { 'true' } else { 'false' }
+        Write-Output "[FIND] Mode.$choice current=$cTxt recommended=$rTxt"
+    }
+    exit 0
+}
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - the setting is read, nothing is changed" }
 

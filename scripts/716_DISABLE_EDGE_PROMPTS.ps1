@@ -6,18 +6,19 @@
 ## category      : apps
 ## icon          : app-window
 ## tags          : edge, default browser, nag, prompts, import, banners
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode          : [select] Action — turn the checked items off or on
+## Mode          : [select] [scan] Action — turn the checked items off or on
 ##   disable     : Turn the checked items off
 ##   enable      : Turn the checked items on — removes the policies, back to defaults
 ## Items         : [multi]  What to stop — pick one or more
@@ -101,6 +102,29 @@ $Definitions = @{
     pindesktop = @{ Label = 'Auto-pinning Edge'; Values = @(
         @{ Path = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer'; Name = 'DisableEdgeDesktopShortcutCreation'; Off = 1 }
     ) }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Meme cible que le corps :
+# disable = valeur presente et egale a Off ; enable = valeur absente.
+# state=ok si toutes les valeurs de l'element sont a la cible, sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('defaultnag', 'importnag', 'restoretabs', 'firstrunnag', 'startuppush', 'searchnag', 'pindesktop')) {
+        $done = $true
+        foreach ($v in $Definitions[$key].Values) {
+            $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($Disable) {
+                if ($null -eq $current -or [int]$current -ne $v.Off) { $done = $false }
+            } else {
+                if ($null -ne (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue)) { $done = $false }
+            }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

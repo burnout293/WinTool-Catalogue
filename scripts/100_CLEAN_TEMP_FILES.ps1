@@ -6,7 +6,7 @@
 ## category      : cleaning
 ## icon          : broom
 ## tags          : temp, temporary, cache, dumps, disk space
-## version       : 2.1
+## version       : 2.2
 ## admin         : true
 ## risk          : low
 ## duration      : medium
@@ -29,7 +29,12 @@
 ##   deliveryopt : [group:OldUpdates] Update sharing cache — Delivery Optimization downloads
 ##   oldlogs    : [group:Logs] Old setup and servicing logs — CBS, DISM, upgrade logs
 ## AllProfiles  : [bool]   All user accounts — otherwise only the current account
-## MinAgeHours  : [number] [scan] Minimum file age — in hours, newer files are kept
+## MinAge       : [select] [scan] Minimum file age — newer files are kept
+##   h0         : No minimum — every file
+##   h1         : Older than 1 hour
+##   h24        : Older than 1 day
+##   h48        : Older than 2 days
+##   h168       : Older than 1 week
 ## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -53,7 +58,12 @@
 ##   deliveryopt : Cache de partage des mises à jour — fichiers Delivery Optimization
 ##   oldlogs    : Anciens journaux d'installation et de maintenance — CBS, DISM, mise à niveau
 ## AllProfiles  : Tous les comptes — sinon uniquement le compte actuel
-## MinAgeHours  : Ancienneté minimale — en heures, les fichiers plus récents sont conservés
+## MinAge       : Ancienneté minimale — les fichiers plus récents sont conservés
+##   h0         : Aucune — tous les fichiers
+##   h1         : Plus d'une heure
+##   h24        : Plus d'un jour
+##   h48        : Plus de 2 jours
+##   h168       : Plus d'une semaine
 ## SafeTest     : Test sans risque — simule chaque modification, ne change rien
 ## Junk       : Fichiers inutiles — Fichiers temporaires, rapports et vidages
 ## OldUpdates : Mises à jour téléchargées — Ce que Windows garde après avoir partagé les mises à jour
@@ -65,7 +75,7 @@
 $CONFIG = @{
     Targets     = @("usertemp", "wintemp", "reports", "dumps", "deliveryopt")
     AllProfiles = $false
-    MinAgeHours = 24
+    MinAge      = "h24"
     SafeTest    = $false
 }
 
@@ -89,7 +99,11 @@ if ($env:WINTOOL_CONFIG) {
 # ce que l'analyse mesure est exactement ce que l'action supprime.
 # ==============================================================================
 
-$cutoff = (Get-Date).AddHours(-[double]$CONFIG.MinAgeHours)
+# Correspondance des choix MinAge -> heures.
+$MinAgeMap = @{ h0 = 0; h1 = 1; h24 = 24; h48 = 48; h168 = 168 }
+$MinAgeHours = $MinAgeMap["$($CONFIG.MinAge)"]
+if ($null -eq $MinAgeHours) { $MinAgeHours = 24 }
+$cutoff = (Get-Date).AddHours(-[double]$MinAgeHours)
 
 function Format-Size {
     param([long] $Bytes)
@@ -255,7 +269,7 @@ if ($targets.Count -eq 0) {
     exit 0
 }
 
-Write-Host "[INFO] Keeping files newer than $($CONFIG.MinAgeHours) hour(s)"
+Write-Host "[INFO] Keeping files newer than $MinAgeHours hour(s)"
 $step = 0
 $total = $targets.Count
 foreach ($target in $targets) {

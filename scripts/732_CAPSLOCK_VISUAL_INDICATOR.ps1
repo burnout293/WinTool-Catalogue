@@ -6,11 +6,11 @@
 ## category      : customize
 ## icon          : keyboard
 ## tags          : caps lock, num lock, indicator, osd, toggle keys, accessibility
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
@@ -32,7 +32,11 @@
 ##   bottom    : Bottom centre
 ##   topright  : Top right
 ##   center    : Centre of the screen
-## DurationMs  : [number] Badge duration — how long the badge stays, in milliseconds
+## BadgeDuration : [select] Badge duration — how long the badge stays
+##   ms800      : 0.8 second
+##   ms1500     : 1.5 seconds
+##   ms2500     : 2.5 seconds
+##   ms4000     : 4 seconds
 ## PackageId   : [hidden] winget package id for the third-party method
 ## SafeTest    : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
@@ -55,7 +59,11 @@
 ##   bottom    : En bas au centre
 ##   topright  : En haut à droite
 ##   center    : Au centre de l'écran
-## DurationMs  : Durée de la pastille — combien de temps elle reste, en millisecondes
+## BadgeDuration : Durée de la pastille — combien de temps elle reste
+##   ms800      : 0,8 seconde
+##   ms1500     : 1,5 seconde
+##   ms2500     : 2,5 secondes
+##   ms4000     : 4 secondes
 ## PackageId   : Identifiant winget pour la méthode tierce
 ## SafeTest    : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
@@ -65,7 +73,7 @@ $CONFIG = @{
     Method     = "sound"
     WatchKeys  = @("caps")
     Position   = "bottom"
-    DurationMs = 1200
+    BadgeDuration = "ms1500"
     PackageId  = "JonasKohl.CapsLockIndicator"
     SafeTest   = $false
 }
@@ -115,7 +123,10 @@ function Build-HelperScript {
     $keys  = @($CONFIG.WatchKeys) | Where-Object { $vkMap.ContainsKey($_) }
     if ($keys.Count -eq 0) { $keys = @('caps') }
     $entries = ($keys | ForEach-Object { "@{Name='$($names[$_])';VK=$($vkMap[$_])}" }) -join ','
-    $dur = [int]$CONFIG.DurationMs; if ($dur -lt 300) { $dur = 300 }; if ($dur -gt 10000) { $dur = 10000 }
+    # Correspondance des choix BadgeDuration -> millisecondes.
+    $durMap = @{ ms800 = 800; ms1500 = 1500; ms2500 = 2500; ms4000 = 4000 }
+    $dur = $durMap["$($CONFIG.BadgeDuration)"]; if ($null -eq $dur) { $dur = 1500 }
+    if ($dur -lt 300) { $dur = 300 }; if ($dur -gt 10000) { $dur = 10000 }
 
     return @"
 Add-Type -AssemblyName System.Windows.Forms

@@ -6,11 +6,11 @@
 ## category      : performance
 ## icon          : zap
 ## tags          : dns, network, internet, cloudflare, google, quad9, adguard
-## version       : 2.1
+## version       : 2.2
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

@@ -6,18 +6,19 @@
 ## category      : tools
 ## icon          : settings
 ## tags          : windows update, defer, restart, active hours, drivers, policy
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode              : [select] Action — turn the checked controls on or off
+## Mode              : [select] [scan] Action — turn the checked controls on or off
 ##   enable          : Turn the checked controls on
 ##   disable         : Turn the checked controls off — back to the Windows defaults
 ## Items             : [multi]  Controls — pick one or more
@@ -30,10 +31,70 @@
 ##   excludedrivers  : Keep my drivers — do not get drivers from Windows Update
 ##   pausep2p        : Do not share updates — turn off update sharing to other PCs
 ##   stopauto        : Stop automatic updates — you decide when to check (advanced)
-## FeatureDeferDays  : [number] Feature update delay — in days, up to 365
-## QualityDeferDays  : [number] Monthly update delay — in days, up to 30
-## ActiveStart       : [number] Active hours start — 0 to 23
-## ActiveEnd         : [number] Active hours end — 0 to 23
+## FeatureDelay      : [select] [scan] Feature update delay
+##   d0              : No delay
+##   d30             : 30 days
+##   d60             : 60 days
+##   d90             : 90 days
+##   d180            : 180 days
+##   d365            : 365 days
+## QualityDelay      : [select] [scan] Monthly update delay
+##   d0              : No delay
+##   d7              : 7 days
+##   d14             : 14 days
+##   d15             : 15 days
+##   d21             : 21 days
+##   d30             : 30 days
+## ActiveFrom        : [select] [scan] Active hours start
+##   h0              : 0:00
+##   h1              : 1:00
+##   h2              : 2:00
+##   h3              : 3:00
+##   h4              : 4:00
+##   h5              : 5:00
+##   h6              : 6:00
+##   h7              : 7:00
+##   h8              : 8:00
+##   h9              : 9:00
+##   h10             : 10:00
+##   h11             : 11:00
+##   h12             : 12:00
+##   h13             : 13:00
+##   h14             : 14:00
+##   h15             : 15:00
+##   h16             : 16:00
+##   h17             : 17:00
+##   h18             : 18:00
+##   h19             : 19:00
+##   h20             : 20:00
+##   h21             : 21:00
+##   h22             : 22:00
+##   h23             : 23:00
+## ActiveTo          : [select] [scan] Active hours end
+##   h0              : 0:00
+##   h1              : 1:00
+##   h2              : 2:00
+##   h3              : 3:00
+##   h4              : 4:00
+##   h5              : 5:00
+##   h6              : 6:00
+##   h7              : 7:00
+##   h8              : 8:00
+##   h9              : 9:00
+##   h10             : 10:00
+##   h11             : 11:00
+##   h12             : 12:00
+##   h13             : 13:00
+##   h14             : 14:00
+##   h15             : 15:00
+##   h16             : 16:00
+##   h17             : 17:00
+##   h18             : 18:00
+##   h19             : 19:00
+##   h20             : 20:00
+##   h21             : 21:00
+##   h22             : 22:00
+##   h23             : 23:00
 ## SafeTest          : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -53,20 +114,80 @@
 ##   excludedrivers  : Garder mes pilotes — ne pas recevoir les pilotes via Windows Update
 ##   pausep2p        : Ne pas partager les mises à jour — coupe le partage vers d'autres PC
 ##   stopauto        : Stopper les mises à jour automatiques — vous décidez quand chercher (avancé)
-## FeatureDeferDays  : Report des fonctionnalités — en jours, jusqu'à 365
-## QualityDeferDays  : Report des mises à jour mensuelles — en jours, jusqu'à 30
-## ActiveStart       : Début des heures d'activité — 0 à 23
-## ActiveEnd         : Fin des heures d'activité — 0 à 23
+## FeatureDelay      : Report des mises à jour de fonctionnalités
+##   d0              : Aucun report
+##   d30             : 30 jours
+##   d60             : 60 jours
+##   d90             : 90 jours
+##   d180            : 180 jours
+##   d365            : 365 jours
+## QualityDelay      : Report des mises à jour mensuelles
+##   d0              : Aucun report
+##   d7              : 7 jours
+##   d14             : 14 jours
+##   d15             : 15 jours
+##   d21             : 21 jours
+##   d30             : 30 jours
+## ActiveFrom        : Début des heures d'activité
+##   h0              : 0 h
+##   h1              : 1 h
+##   h2              : 2 h
+##   h3              : 3 h
+##   h4              : 4 h
+##   h5              : 5 h
+##   h6              : 6 h
+##   h7              : 7 h
+##   h8              : 8 h
+##   h9              : 9 h
+##   h10             : 10 h
+##   h11             : 11 h
+##   h12             : 12 h
+##   h13             : 13 h
+##   h14             : 14 h
+##   h15             : 15 h
+##   h16             : 16 h
+##   h17             : 17 h
+##   h18             : 18 h
+##   h19             : 19 h
+##   h20             : 20 h
+##   h21             : 21 h
+##   h22             : 22 h
+##   h23             : 23 h
+## ActiveTo          : Fin des heures d'activité
+##   h0              : 0 h
+##   h1              : 1 h
+##   h2              : 2 h
+##   h3              : 3 h
+##   h4              : 4 h
+##   h5              : 5 h
+##   h6              : 6 h
+##   h7              : 7 h
+##   h8              : 8 h
+##   h9              : 9 h
+##   h10             : 10 h
+##   h11             : 11 h
+##   h12             : 12 h
+##   h13             : 13 h
+##   h14             : 14 h
+##   h15             : 15 h
+##   h16             : 16 h
+##   h17             : 17 h
+##   h18             : 18 h
+##   h19             : 19 h
+##   h20             : 20 h
+##   h21             : 21 h
+##   h22             : 22 h
+##   h23             : 23 h
 ## SafeTest          : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
 
 $CONFIG = @{
     Mode             = "enable"
     Items            = @("noautorestart", "noforcedrestart", "activehours", "excludedrivers")
-    FeatureDeferDays = 180
-    QualityDeferDays = 15
-    ActiveStart      = 8
-    ActiveEnd        = 20
+    FeatureDelay     = "d180"
+    QualityDelay     = "d15"
+    ActiveFrom       = "h8"
+    ActiveTo         = "h20"
     SafeTest         = $false
 }
 
@@ -97,7 +218,16 @@ $WU = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
 $AU = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
 $DO = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization'
 
-function I { param($v, $lo, $hi, $def) $n = 0; if ([int]::TryParse("$v", [ref]$n)) { if ($n -lt $lo) { return $lo }; if ($n -gt $hi) { return $hi }; return $n }; return $def }
+# Correspondance id de choix -> nombre ; id inconnu -> valeur par defaut.
+$FeatureDays = @{ d0 = 0; d30 = 30; d60 = 60; d90 = 90; d180 = 180; d365 = 365 }
+$QualityDays = @{ d0 = 0; d7 = 7; d14 = 14; d15 = 15; d21 = 21; d30 = 30 }
+$Hours = @{}
+foreach ($h in 0..23) { $Hours["h$h"] = $h }
+function Pick { param($map, $id, $def) $k = "$id"; if ($map.ContainsKey($k)) { return $map[$k] }; return $def }
+$FeatureDeferDays = Pick $FeatureDays $CONFIG.FeatureDelay 180
+$QualityDeferDays = Pick $QualityDays $CONFIG.QualityDelay 15
+$ActiveStart      = Pick $Hours $CONFIG.ActiveFrom 8
+$ActiveEnd        = Pick $Hours $CONFIG.ActiveTo 20
 
 # Chaque item -> liste de valeurs {Path, Name, On}. On calcule On au moment voulu
 # pour injecter les nombres de config.
@@ -108,12 +238,12 @@ function Get-ItemValues {
         'noautorestart'   { return @(@{ Path = $AU; Name = 'NoAutoRebootWithLoggedOnUsers'; On = 1 }) }
         'noforcedrestart' { return @(@{ Path = $AU; Name = 'AutoRestartDeadlinePeriodInDays'; On = 0 }, @{ Path = $WU; Name = 'SetAutoRestartDeadline'; On = 0 }) }
         'activehours'     { return @(@{ Path = $WU; Name = 'SetActiveHours'; On = 1 },
-                                     @{ Path = $WU; Name = 'ActiveHoursStart'; On = (I $CONFIG.ActiveStart 0 23 8) },
-                                     @{ Path = $WU; Name = 'ActiveHoursEnd';   On = (I $CONFIG.ActiveEnd   0 23 20) }) }
+                                     @{ Path = $WU; Name = 'ActiveHoursStart'; On = $ActiveStart },
+                                     @{ Path = $WU; Name = 'ActiveHoursEnd';   On = $ActiveEnd }) }
         'deferfeature'    { return @(@{ Path = $WU; Name = 'DeferFeatureUpdates'; On = 1 },
-                                     @{ Path = $WU; Name = 'DeferFeatureUpdatesPeriodInDays'; On = (I $CONFIG.FeatureDeferDays 0 365 180) }) }
+                                     @{ Path = $WU; Name = 'DeferFeatureUpdatesPeriodInDays'; On = $FeatureDeferDays }) }
         'deferquality'    { return @(@{ Path = $WU; Name = 'DeferQualityUpdates'; On = 1 },
-                                     @{ Path = $WU; Name = 'DeferQualityUpdatesPeriodInDays'; On = (I $CONFIG.QualityDeferDays 0 30 15) }) }
+                                     @{ Path = $WU; Name = 'DeferQualityUpdatesPeriodInDays'; On = $QualityDeferDays }) }
         'excludedrivers'  { return @(@{ Path = $WU; Name = 'ExcludeWUDriversInQualityUpdate'; On = 1 }) }
         'pausep2p'        { return @(@{ Path = $DO; Name = 'DODownloadMode'; On = 0 }) }
         'stopauto'        { return @(@{ Path = $AU; Name = 'NoAutoUpdate'; On = 1 }) }
@@ -126,6 +256,27 @@ $Labels = @{
     noforcedrestart = 'No forced restart'; activehours = 'Set active hours'
     deferfeature = 'Delay feature updates'; deferquality = 'Delay monthly updates'
     excludedrivers = 'Keep my drivers'; pausep2p = 'Do not share updates'; stopauto = 'Stop automatic updates'
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Mode enable : state=ok si toutes
+# les valeurs sont deja posees (avec les nombres choisis) ; mode disable :
+# state=ok si toutes les valeurs sont absentes.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current policies"
+    foreach ($key in @('notifydownload', 'noautorestart', 'noforcedrestart', 'activehours', 'deferfeature', 'deferquality', 'excludedrivers', 'pausep2p', 'stopauto')) {
+        $done = $true
+        foreach ($v in (Get-ItemValues $key)) {
+            $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($Enable) {
+                if ($null -eq $current -or [int]$current -ne [int]$v.On) { $done = $false }
+            } elseif ($null -ne $current) { $done = $false }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - policies are read, nothing is changed" }

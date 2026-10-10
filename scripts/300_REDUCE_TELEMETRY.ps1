@@ -5,14 +5,14 @@
 ## desc          : Reduces the diagnostic data Windows sends to Microsoft
 ## category      : privacy
 ## icon          : shield-check
-## tags          : telemetry, diagtrack, diagnostic data, ceip, privacy
-## version       : 2.1
+## tags          : telemetry, diagtrack, diagnostic data, ceip, privacy, restart required, redémarrage
+## version       : 2.2
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
-## reboot         : true
+## reboot         : false
 ## engine        : auto
 ## scan          : true
 ## view          : compare

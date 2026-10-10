@@ -6,14 +6,15 @@
 ## category      : customize
 ## icon          : monitor
 ## tags          : volume, media, flyout, mtc, osd
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
@@ -60,6 +61,24 @@ $Simple   = ($CONFIG.Mode -ne 'enable')
 $path     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\MTCUVC'
 
 if ($Simple) { $wanted = 0 } else { $wanted = 1 }
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Bandeau simple actif si
+# EnableMtcUvc = 0 ; absent = defaut Windows (panneau moderne).
+# recommended = choix par defaut (disable).
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading the current volume indicator"
+    $cur = (Get-ItemProperty -Path $path -Name 'EnableMtcUvc' -ErrorAction SilentlyContinue).EnableMtcUvc
+    $isSimple = ($null -ne $cur -and [int]$cur -eq 0)
+    foreach ($choice in @('disable', 'enable')) {
+        $isCurrent = if ($choice -eq 'disable') { $isSimple } else { -not $isSimple }
+        $cTxt = if ($isCurrent) { 'true' } else { 'false' }
+        $rTxt = if ($choice -eq 'disable') { 'true' } else { 'false' }
+        Write-Output "[FIND] Mode.$choice current=$cTxt recommended=$rTxt"
+    }
+    exit 0
+}
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - the setting is read, nothing is changed" }
 

@@ -6,7 +6,7 @@
 ## category      : cleaning
 ## icon          : globe
 ## tags          : browser, cache, cookies, history, edge, chrome, firefox, brave, opera
-## version       : 3.0
+## version       : 3.1
 ## admin         : false
 ## risk          : medium
 ## duration      : fast
@@ -14,6 +14,9 @@
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
+## view          : bars
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
@@ -23,7 +26,7 @@
 ##   firefox     : Mozilla Firefox
 ##   brave       : Brave
 ##   opera       : Opera
-## Items         : [multi]  What to clear — bookmarks and passwords are never included
+## Items         : [multi]  [scan] What to clear — bookmarks and passwords are never included
 ##   cache       : Cache — temporary web files, always safe to clear
 ##   cookies     : Cookies — you will be signed out of websites
 ##   history     : History — browsing and download history (not Firefox, see note)
@@ -184,6 +187,45 @@ function Remove-Target {
     }
 }
 
+# Mesure (analyse, lecture seule) : taille + nombre de fichiers de ce que
+# Remove-Target supprimerait, avec les MEMES chemins (Get-Targets).
+function Measure-Browser {
+    param($Def, $Items)
+    $size = [long]0; $count = 0
+    foreach ($item in $Items) {
+        foreach ($t in @(Get-Targets $Def "$item")) {
+            if ($t -eq '__FIREFOX_HISTORY__') { continue }
+            if (Test-Path -LiteralPath $t -PathType Container) {
+                $files = @(Get-ChildItem -LiteralPath $t -Recurse -Force -File -ErrorAction SilentlyContinue)
+            } else {
+                $files = @(Get-Item -LiteralPath $t -Force -ErrorAction SilentlyContinue)
+            }
+            $size  += [long](($files | Measure-Object -Property Length -Sum).Sum)
+            $count += $files.Count
+        }
+    }
+    [pscustomobject]@{ Size = $size; Count = $count }
+}
+
+# ==============================================================================
+# ANALYSE - on mesure, on ne supprime ni ne ferme RIEN
+# ==============================================================================
+
+if ($env:WINTOOL_MODE -eq 'scan') {
+    $order = @('edge', 'chrome', 'firefox', 'brave', 'opera')
+    $i = 0
+    foreach ($b in $order) {
+        $i++
+        Write-Output "[STEP] $i/$($order.Count) Measuring $b"
+        $def = $BrowserDefs[$b]
+        # Navigateur absent : aucun constat.
+        if (-not (Test-Path -LiteralPath $def.Root)) { continue }
+        $m = Measure-Browser $def @($CONFIG.Items)
+        Write-Output "[FIND] Browsers.$b size=$($m.Size) count=$($m.Count)"
+    }
+    exit 0
+}
+
 # ==============================================================================
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - data is measured, nothing is closed or deleted" }
@@ -259,6 +301,7 @@ if ($SafeTest) {
     Write-Host "[DONE] SafeTest finished - nothing was deleted"
     exit 0
 }
+Write-Output "[FREED] $freed"
 Write-Host "[INFO] Total freed: $(Format-Size $freed)"
 Write-Host "[DONE] Browser data cleaned"
 exit 0

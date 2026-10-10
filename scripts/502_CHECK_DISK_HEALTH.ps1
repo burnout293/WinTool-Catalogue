@@ -6,11 +6,11 @@
 ## category      : health
 ## icon          : hard-drive
 ## tags          : smart, disk, ssd, hdd, wear, temperature, free space
-## version       : 2.1
+## version       : 2.2
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto

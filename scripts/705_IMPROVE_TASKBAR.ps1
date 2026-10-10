@@ -6,18 +6,19 @@
 ## category      : customize
 ## icon          : layout-grid
 ## tags          : taskbar, search, bing, widgets, task view, copilot, chat, alignment
-## version       : 1.0
+## version       : 1.1
 ## admin         : false
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode            : [select] Action — apply the clean-up or restore the Windows defaults
+## Mode            : [select] [scan] Action — apply the clean-up or restore the Windows defaults
 ##   apply         : Apply the clean-up
 ##   restore       : Restore the Windows defaults
 ## Items           : [multi]  What to change — pick one or more
@@ -136,6 +137,27 @@ function Set-Value {
         Set-ItemProperty -Path $V.Path -Name $V.Name -Value $wanted -Type DWord -ErrorAction Stop
         Write-Host "[OK]   $($V.Name) = $wanted"; $script:changed = $true
     } catch { Write-Host "[ERR]  $($V.Name): $($_.Exception.Message)"; $script:errors++ }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Pour chaque element, state=ok si
+# toutes ses valeurs sont deja a la cible du Mode (Default $null = valeur absente).
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('websearch', 'hidesearchbox', 'taskview', 'widgets', 'chat', 'copilot', 'leftalign')) {
+        $done = $true
+        foreach ($v in $Definitions[$key].Values) {
+            $wanted  = if ($Restore) { $v.Default } else { $v.Off }
+            $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($null -eq $wanted) {
+                if ($null -ne $current) { $done = $false }
+            } elseif ($null -eq $current -or [int]$current -ne $wanted) { $done = $false }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }

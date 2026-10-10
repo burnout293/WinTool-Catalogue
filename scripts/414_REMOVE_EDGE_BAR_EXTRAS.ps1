@@ -6,18 +6,19 @@
 ## category      : apps
 ## icon          : app-window
 ## tags          : edge, sidebar, copilot, shopping, msn, new tab, policy
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Mode          : [select] Action — turn the checked items off or on
+## Mode          : [select] [scan] Action — turn the checked items off or on
 ##   disable     : Turn the checked items off
 ##   enable      : Turn the checked items on — removes the policies, back to Edge defaults
 ## Items         : [multi]  What to declutter — pick one or more
@@ -119,6 +120,29 @@ $Definitions = @{
         @{ Name = 'GamesMenuEnabled'; Off = 0 },
         @{ Name = 'WebWidgetAllowed'; Off = 0 }
     ) }
+}
+
+# ==============================================================================
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Meme cible que le corps :
+# disable = valeur presente et egale a Off ; enable = valeur absente.
+# state=ok si toutes les valeurs de l'element sont a la cible, sinon state=todo.
+# ==============================================================================
+if ($env:WINTOOL_MODE -eq 'scan') {
+    Write-Output "[STEP] 1/1 Reading current settings"
+    foreach ($key in @('sidebar', 'copilot', 'shopping', 'collections', 'msncontent', 'feedback', 'firstrun', 'recommend', 'games')) {
+        $done = $true
+        foreach ($v in $Definitions[$key].Values) {
+            $current = (Get-ItemProperty -Path $edge -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
+            if ($Disable) {
+                if ($null -eq $current -or [int]$current -ne $v.Off) { $done = $false }
+            } else {
+                if ($null -ne (Get-ItemProperty -Path $edge -Name $v.Name -ErrorAction SilentlyContinue)) { $done = $false }
+            }
+        }
+        $state = if ($done) { 'ok' } else { 'todo' }
+        Write-Output "[FIND] Items.$key state=$state"
+    }
+    exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - policies are read, nothing is changed" }

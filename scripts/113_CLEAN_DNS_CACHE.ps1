@@ -6,11 +6,11 @@
 ## category      : cleaning
 ## icon          : globe
 ## tags          : dns, flushdns, netbios, arp, network cache, resolver
-## version       : 1.0
+## version       : 1.1
 ## admin         : true
 ## risk          : low
 ## duration      : fast
-## reversible    : true
+## reversible    : false
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
