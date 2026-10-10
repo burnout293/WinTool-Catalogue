@@ -28,7 +28,7 @@
 ##   thumbnails : [group:Junk] Thumbnail cache — rebuilt automatically by Explorer
 ##   deliveryopt : [group:OldUpdates] Update sharing cache — Delivery Optimization downloads
 ##   oldlogs    : [group:Logs] Old setup and servicing logs — CBS, DISM, upgrade logs
-## AllProfiles  : [bool]   [scan] All user accounts — otherwise only the current account
+## AllProfiles  : [bool]   All user accounts — otherwise only the current account
 ## MinAgeHours  : [number] [scan] Minimum file age — in hours, newer files are kept
 ## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END

@@ -6,7 +6,7 @@
 ## category      : performance
 ## icon          : zap
 ## tags          : dns, network, internet, cloudflare, google, quad9, adguard
-## version       : 2.0
+## version       : 2.1
 ## admin         : true
 ## risk          : medium
 ## duration      : fast
@@ -14,13 +14,16 @@
 ## interruptible : true
 ## reboot        : false
 ## engine        : auto
+## scan          : true
+## view          : chart
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
 ## Mode         : [select] Action — use a DNS provider or go back to automatic
 ##   apply      : Use the chosen DNS provider
 ##   restore    : Go back to the automatic DNS of your internet box
-## DnsProvider  : [select] DNS provider — the service that resolves website addresses
+## DnsProvider  : [select] DNS provider — measured response time, lower is faster
 ##   cloudflare : Cloudflare — 1.1.1.1, fastest on most connections
 ##   google     : Google — 8.8.8.8, very reliable
 ##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
@@ -35,13 +38,17 @@
 ## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
+## WINTOOL:REPORT
+## SpeedNote : [note:info] Response time is measured from this PC right now. The fastest provider is preselected.
+## WINTOOL:END
+
 ## WINTOOL:LANG fr
 ## title        : Utiliser un Internet plus rapide
 ## desc         : Accélère la navigation en utilisant un service plus rapide pour trouver les sites
 ## Mode         : Action — utiliser un fournisseur DNS ou revenir à l'automatique
 ##   apply      : Utiliser le fournisseur DNS choisi
 ##   restore    : Revenir au DNS automatique de votre box
-## DnsProvider  : Fournisseur DNS — le service qui traduit les adresses des sites
+## DnsProvider  : Fournisseur DNS — temps de réponse mesuré, plus bas = plus rapide
 ##   cloudflare : Cloudflare — 1.1.1.1, le plus rapide sur la plupart des connexions
 ##   google     : Google — 8.8.8.8, très fiable
 ##   quad9      : Quad9 — 9.9.9.9, bloque les domaines malveillants connus
@@ -54,6 +61,7 @@
 ## ApplyToIPv6  : Appliquer à l'IPv6 — résolveurs équivalents
 ## FlushCache   : Vider le cache de résolution ensuite
 ## SafeTest     : Test sans risque — simule chaque modification, ne change rien
+## SpeedNote    : Le temps de réponse est mesuré depuis ce PC, maintenant. Le fournisseur le plus rapide est présélectionné.
 ## WINTOOL:END
 
 $CONFIG = @{
@@ -75,7 +83,15 @@ if ($env:WINTOOL_CONFIG) {
 #
 # Seules les cartes reseau physiques actives sont modifiees (pas les cartes
 # virtuelles : VPN, Hyper-V, VirtualBox...).
-# SafeTest : les cartes et leurs DNS actuels sont lus, rien n'est ecrit.
+#
+# DnsProvider est un [select] : l'analyse MESURE le temps de reponse (ping ICMP)
+# de chaque fournisseur et ecrit une ligne [FIND] par choix avec son ms=. La vue
+# "chart" affiche une colonne par fournisseur ; le plus rapide est recommended=.
+# current= marque le fournisseur deja en place. La mesure est en LECTURE SEULE.
+#
+# Le script est lance deux fois (contrat du mode analyse, 1.4) :
+#   1. ANALYSE (WINTOOL_MODE=scan) — mesure, [FIND] DnsProvider.<id> ms=... Rien ecrit.
+#   2. ACTION — WinTool renvoie dans $CONFIG.DnsProvider le choix retenu.
 # ==============================================================================
 
 $SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
@@ -93,33 +109,97 @@ $Providers = @{
     cleanbrowse = @{ Name = 'CleanBrowsing'; V4 = @('185.228.168.9', '185.228.169.9'); V6 = @('2a0d:2a00:1::2', '2a0d:2a00:2::2') }
 }
 
+# Ordre d'affichage stable des fournisseurs.
+$Order = @('cloudflare', 'google', 'quad9', 'adguard', 'adguardfam', 'opendns', 'opendnsfam', 'mullvad', 'cleanbrowse')
+
+# Mesure le temps de reponse d'une IP (ms), ou $null si injoignable. Lecture seule.
+function Measure-Ping {
+    param([string] $Address, [int] $Timeout = 800)
+    try {
+        $ping  = New-Object System.Net.NetworkInformation.Ping
+        $reply = $ping.Send($Address, $Timeout)
+        if ($reply.Status -eq 'Success') { return [int]$reply.RoundtripTime }
+    } catch { }
+    return $null
+}
+
+# Les cartes reseau physiques actives.
+function Get-ActiveAdapters {
+    @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
+}
+
+# Le fournisseur deja configure, d'apres le premier DNS des cartes actives.
+function Get-CurrentProviderId {
+    $servers = @()
+    foreach ($a in Get-ActiveAdapters) {
+        $servers += @(Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                      ForEach-Object { $_.ServerAddresses })
+    }
+    foreach ($id in $Order) {
+        foreach ($ip in $Providers[$id].V4) {
+            if ($servers -contains $ip) { return $id }
+        }
+    }
+    return $null
+}
+
+# ==============================================================================
+# 1. ANALYSE — on mesure la latence de chaque fournisseur, on ne modifie RIEN
+# ==============================================================================
+
+if ($env:WINTOOL_MODE -eq 'scan') {
+
+    Write-Output "[NOTE] SpeedNote"
+    $current = Get-CurrentProviderId
+
+    $best = $null; $bestMs = $null
+    $i = 0
+    foreach ($id in $Order) {
+        $i++
+        Write-Output "[STEP] $i/$($Order.Count) Testing $($Providers[$id].Name)"
+        $ms = Measure-Ping $Providers[$id].V4[0]
+        $isCur = if ($id -eq $current) { 'true' } else { 'false' }
+        if ($null -ne $ms) {
+            if ($null -eq $bestMs -or $ms -lt $bestMs) { $bestMs = $ms; $best = $id }
+            Write-Output "[FIND] DnsProvider.$id ms=$ms current=$isCur"
+            Write-Output "[LOG] DNS $($Providers[$id].Name): $ms ms"
+        } else {
+            # Injoignable : on montre le choix sans ms (pas de barre), jamais recommande.
+            Write-Output "[FIND] DnsProvider.$id current=$isCur"
+            Write-Output "[LOG] DNS $($Providers[$id].Name): unreachable"
+        }
+    }
+
+    # Le plus rapide est presélectionné.
+    if ($best) { Write-Output "[FIND] DnsProvider.$best recommended=true" }
+
+    exit 0
+}
+
+# ==============================================================================
+# 2. ACTION — applique le fournisseur retenu (ou restaure l'automatique)
+# ==============================================================================
+
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - network settings are read, nothing is changed" }
 
-# --- 1/3 : cartes reseau ----------------------------------------------------
 Write-Host "[STEP] 1/3 Finding active network adapters"
-
-$adapters = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
+$adapters = @(Get-ActiveAdapters)
 if ($adapters.Count -eq 0) {
     Write-Host "[ERR]  No active network adapter found"
     Write-Host "[DONE] Finished with 1 error(s)"
     exit 1
 }
-
 foreach ($a in $adapters) {
-    $current = @(Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue |
-                 ForEach-Object { $_.ServerAddresses }) -join ', '
-    if (-not $current) { $current = 'none' }
-    Write-Host "[INFO] $($a.Name) - current DNS: $current"
+    $cur = @(Get-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ErrorAction SilentlyContinue |
+             ForEach-Object { $_.ServerAddresses }) -join ', '
+    if (-not $cur) { $cur = 'none' }
+    Write-Host "[INFO] $($a.Name) - current DNS: $cur"
 }
 
-# --- 2/3 : application ------------------------------------------------------
 if ($CONFIG.Mode -eq 'restore') {
     Write-Host "[STEP] 2/3 Restoring automatic DNS"
     foreach ($a in $adapters) {
-        if ($SafeTest) {
-            Write-Host "[INFO] SafeTest - would reset $($a.Name) to automatic DNS"
-            continue
-        }
+        if ($SafeTest) { Write-Host "[INFO] SafeTest - would reset $($a.Name) to automatic DNS"; continue }
         try {
             Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ResetServerAddresses -ErrorAction Stop
             Write-Host "[OK]   $($a.Name): automatic DNS restored"
@@ -129,22 +209,17 @@ if ($CONFIG.Mode -eq 'restore') {
         }
     }
 } else {
-    $p = $Providers[$CONFIG.DnsProvider]
+    $p = $Providers["$($CONFIG.DnsProvider)"]
     if (-not $p) {
         Write-Host "[ERR]  Unknown DNS provider '$($CONFIG.DnsProvider)'"
         Write-Host "[DONE] Finished with 1 error(s)"
         exit 1
     }
     Write-Host "[STEP] 2/3 Applying $($p.Name) DNS"
-
     $servers = @($p.V4)
-    if ($CONFIG.ApplyToIPv6) { $servers += $p.V6 }
-
+    if (("$($CONFIG.ApplyToIPv6)" -eq 'True')) { $servers += $p.V6 }
     foreach ($a in $adapters) {
-        if ($SafeTest) {
-            Write-Host "[INFO] SafeTest - would set $($a.Name) DNS to $($servers -join ', ')"
-            continue
-        }
+        if ($SafeTest) { Write-Host "[INFO] SafeTest - would set $($a.Name) DNS to $($servers -join ', ')"; continue }
         try {
             Set-DnsClientServerAddress -InterfaceIndex $a.ifIndex -ServerAddresses $servers -ErrorAction Stop
             Write-Host "[OK]   $($a.Name): $($p.Name) DNS applied"
@@ -155,10 +230,8 @@ if ($CONFIG.Mode -eq 'restore') {
     }
 }
 
-# --- 3/3 : cache et verification ---------------------------------------------
 Write-Host "[STEP] 3/3 Checking name resolution"
-
-if ($CONFIG.FlushCache) {
+if (("$($CONFIG.FlushCache)" -eq 'True')) {
     if ($SafeTest) {
         Write-Host "[INFO] SafeTest - would flush the DNS cache"
     } else {
@@ -166,7 +239,6 @@ if ($CONFIG.FlushCache) {
         Write-Host "[OK]   DNS cache flushed"
     }
 }
-
 try {
     $null = Resolve-DnsName -Name 'www.microsoft.com' -DnsOnly -ErrorAction Stop
     Write-Host "[OK]   Name resolution works"
