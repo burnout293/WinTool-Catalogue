@@ -6,7 +6,7 @@
 ## category      : privacy
 ## icon          : eye-off
 ## tags          : advertising id, ads, tracking, suggestions, tailored experiences
-## version       : 2.1
+## version       : 2.2
 ## admin         : false
 ## risk          : low
 ## duration      : fast
@@ -15,16 +15,19 @@
 ## reboot        : false
 ## engine        : auto
 ## scan          : true
+## view          : tree
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
 ## Mode          : [select] [scan] Action — turn the checked items off or on
 ##   disable     : Turn the checked items off
 ##   enable      : Turn the checked items on
-## Items         : [multi]  What to disable — pick one or more
+## Items         : [multi] [scan]  What to disable — pick one or more
 ##   adid        : Advertising ID — used by apps to show targeted ads
 ##   apptracking : App launch tracking — used to personalise Start and search
 ##   tailored    : Tailored experiences — tips and offers based on your diagnostic data
+## Details       : [items] [view:tree] Exact changes — expand an item to see each registry value, current -> target
 ## SafeTest      : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -38,12 +41,14 @@
 ##   adid        : Identifiant publicitaire — utilisé par les applications pour cibler les publicités
 ##   apptracking : Suivi des lancements d'applications — sert à personnaliser Démarrer et la recherche
 ##   tailored    : Expériences personnalisées — astuces et offres basées sur vos données de diagnostic
+## Details       : Modifications exactes — dépliez un élément pour voir chaque valeur de registre, actuelle -> cible
 ## SafeTest      : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
 
 $CONFIG = @{
     Mode     = "disable"
     Items    = @("adid", "apptracking", "tailored")
+    Details  = @()
     SafeTest = $false
 }
 
@@ -78,35 +83,53 @@ $Definitions = @{
     ) }
 }
 
+# Chemin lisible d'une cle (HKCU:\... -> HKCU\...).
+function Format-Key([string] $p) { return ($p -replace '^(HK[A-Z]+):', '$1') }
+function Format-Val($v) { if ($null -eq $v) { return 'not set' } return "$v" }
+
 # ==============================================================================
-# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Pour chaque element, state=ok si
-# toutes ses valeurs sont deja a la cible du Mode choisi, sinon state=todo.
+# ANALYSE (WINTOOL_MODE=scan) — lecture seule. Arbre : un parent par element,
+# un enfant par valeur de registre (nom: actuel -> cible, et le chemin de la cle).
+# L'id d'un enfant est "<element>-<index>" : stable pour une version du fichier.
+# Coche d'office : la valeur n'est pas a la cible ET l'element est dans Items.
 # ==============================================================================
 if ($env:WINTOOL_MODE -eq 'scan') {
     Write-Output "[STEP] 1/1 Reading current settings"
+    $selected = @($CONFIG.Items | ForEach-Object { "$_" })
     foreach ($key in @('adid', 'apptracking', 'tailored')) {
-        $done = $true
-        foreach ($v in $Definitions[$key].Values) {
+        $def = $Definitions[$key]
+        Write-Output "[ITEM] Details id=$key name=""$($def.Label)"" kind=registry"
+        for ($i = 0; $i -lt $def.Values.Count; $i++) {
+            $v       = $def.Values[$i]
             $wanted  = if ($Restore) { $v.Default } else { $v.Off }
             $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
-            if ($null -eq $current -or [int]$current -ne $wanted) { $done = $false }
+            $done    = ($null -ne $current -and [int]$current -eq $wanted)
+            $state   = if ($done) { 'ok' } else { 'todo' }
+            $chk     = if (-not $done -and $selected -contains $key) { 'true' } else { 'false' }
+            Write-Output "[ITEM] Details id=$key-$i parent=$key kind=registry name=""$($v.Name): $(Format-Val $current) -> $wanted"" path=""$(Format-Key $v.Path)"" state=$state checked=$chk"
         }
-        $state = if ($done) { 'ok' } else { 'todo' }
-        Write-Output "[FIND] Items.$key state=$state"
     }
     exit 0
 }
 
 if ($SafeTest) { Write-Host "[INFO] SafeTest mode - settings are read, nothing is changed" }
 
-$items = @($CONFIG.Items)
+# Apres une analyse, Details contient les valeurs cochees ("<element>-<index>").
+# Sans analyse (double-clic, lancement direct), Details est vide : on applique
+# tous les elements de Items, comme avant.
+$detail = @($CONFIG.Details | ForEach-Object { "$_" } | Where-Object { $_ -match '^[a-z]+-\d+$' })
+if ($detail.Count -gt 0) {
+    $items = @(@('adid', 'apptracking', 'tailored') | Where-Object { $k = $_; @($detail | Where-Object { $_ -like "$k-*" }).Count -gt 0 })
+} else {
+    $items = @($CONFIG.Items)
+}
 if ($items.Count -eq 0) {
     Write-Host "[WARN] Nothing selected - nothing to do"
     Write-Host "[DONE] Nothing changed"
     exit 0
 }
 
-$step = 0
+$step  = 0
 $total = $items.Count
 foreach ($key in $items) {
     $step++
@@ -118,7 +141,9 @@ foreach ($key in $items) {
     }
     Write-Host "[STEP] $step/$total $($def.Label)"
 
-    foreach ($v in $def.Values) {
+    for ($i = 0; $i -lt $def.Values.Count; $i++) {
+        if ($detail.Count -gt 0 -and $detail -notcontains "$key-$i") { continue }
+        $v = $def.Values[$i]
         if ($Restore) { $wanted = $v.Default } else { $wanted = $v.Off }
         $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
 
@@ -127,13 +152,13 @@ foreach ($key in $items) {
             continue
         }
         if ($SafeTest) {
-            Write-Host "[INFO] SafeTest - would set $($v.Name) = $wanted (currently $(if ($null -eq $current) { 'not set' } else { $current }))"
+            Write-Host "[INFO] SafeTest - would set $(Format-Key $v.Path)\$($v.Name) = $wanted (currently $(Format-Val $current))"
             continue
         }
         try {
             if (-not (Test-Path $v.Path)) { New-Item -Path $v.Path -Force -ErrorAction Stop | Out-Null }
             Set-ItemProperty -Path $v.Path -Name $v.Name -Value $wanted -Type DWord -ErrorAction Stop
-            Write-Host "[OK]   $($v.Name) = $wanted"
+            Write-Host "[OK]   $(Format-Key $v.Path)\$($v.Name) = $wanted"
         } catch {
             Write-Host "[ERR]  $($v.Name): $($_.Exception.Message)"
             $errors++

@@ -6,7 +6,7 @@
 ## category      : privacy
 ## icon          : shield-check
 ## tags          : telemetry, browser, edge, chrome, firefox, brave, opera, policy
-## version       : 1.1
+## version       : 1.2
 ## admin         : true
 ## risk          : low
 ## duration      : fast
@@ -15,18 +15,21 @@
 ## reboot        : false
 ## engine        : auto
 ## scan          : true
+## view          : tree
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
 ## Mode        : [select] [scan] Action — turn browser telemetry off or on
 ##   disable   : Disable telemetry — reduce what browsers report
 ##   enable    : Enable telemetry — remove the policies, back to each browser's default
-## Browsers    : [multi]  Browsers — pick one or more
+## Browsers    : [multi] [scan]  Browsers — pick one or more
 ##   edge      : Microsoft Edge
 ##   chrome    : Google Chrome
 ##   firefox   : Mozilla Firefox
 ##   brave     : Brave
 ##   opera     : Opera
+## Details     : [items] [view:tree] Exact changes — expand a browser to see each policy, current -> target
 ## SafeTest    : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
@@ -42,12 +45,14 @@
 ##   firefox   : Mozilla Firefox
 ##   brave     : Brave
 ##   opera     : Opera
+## Details     : Modifications exactes — dépliez un navigateur pour voir chaque stratégie, actuelle -> cible
 ## SafeTest    : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
 
 $CONFIG = @{
     Mode     = "disable"
     Browsers = @("edge", "chrome", "firefox", "brave", "opera")
+    Details  = @()
     SafeTest = $false
 }
 
@@ -105,25 +110,31 @@ $BrowserDefs = @{
     ) }
 }
 
+function Format-Key([string] $p) { return ($p -replace '^(HK[A-Z]+):', '$1') }
+function Format-Val($v) { if ($null -eq $v) { return 'not set' } return "$v" }
+
 # ==============================================================================
-# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Pour chaque navigateur, state=ok
-# si toutes ses strategies sont a la cible du Mode : disable = valeur Off,
-# enable = valeur absente (le corps la supprime). Sinon state=todo.
+# ANALYSE (WINTOOL_MODE=scan) - lecture seule. Arbre : un parent par navigateur,
+# un enfant par strategie (nom: actuel -> cible, et le chemin de la cle).
+# Cible : disable = valeur Off ; enable = valeur supprimee ("removed").
+# Id d'un enfant : "<navigateur>-<index>". Coche d'office si pas a la cible ET
+# navigateur dans Browsers.
 # ==============================================================================
 if ($env:WINTOOL_MODE -eq 'scan') {
     Write-Output "[STEP] 1/1 Reading current policies"
+    $selected = @($CONFIG.Browsers | ForEach-Object { "$_" })
     foreach ($key in @('edge', 'chrome', 'firefox', 'brave', 'opera')) {
-        $done = $true
-        foreach ($v in $BrowserDefs[$key].Values) {
+        $def = $BrowserDefs[$key]
+        Write-Output "[ITEM] Details id=$key name=""$($def.Name)"" kind=browser"
+        for ($i = 0; $i -lt $def.Values.Count; $i++) {
+            $v       = $def.Values[$i]
             $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
-            if ($Disable) {
-                if ($null -eq $current -or [int]$current -ne $v.Off) { $done = $false }
-            } else {
-                if ($null -ne $current) { $done = $false }
-            }
+            if ($Disable) { $done = ($null -ne $current -and [int]$current -eq $v.Off); $target = "$($v.Off)" }
+            else          { $done = ($null -eq $current); $target = 'removed' }
+            $state = if ($done) { 'ok' } else { 'todo' }
+            $chk   = if (-not $done -and $selected -contains $key) { 'true' } else { 'false' }
+            Write-Output "[ITEM] Details id=$key-$i parent=$key kind=registry name=""$($v.Name): $(Format-Val $current) -> $target"" path=""$(Format-Key $v.Path)"" state=$state checked=$chk"
         }
-        $state = if ($done) { 'ok' } else { 'todo' }
-        Write-Output "[FIND] Browsers.$key state=$state"
     }
     exit 0
 }
@@ -135,7 +146,13 @@ if ($Disable) {
     Write-Host "[INFO] Removing the telemetry policies - browsers go back to their own default"
 }
 
-$browsers = @($CONFIG.Browsers)
+# Apres une analyse : Details = strategies cochees. Sans analyse : tous les Browsers.
+$detail = @($CONFIG.Details | ForEach-Object { "$_" } | Where-Object { $_ -match '^[a-z]+-\d+$' })
+if ($detail.Count -gt 0) {
+    $browsers = @(@('edge', 'chrome', 'firefox', 'brave', 'opera') | Where-Object { $k = $_; @($detail | Where-Object { $_ -like "$k-*" }).Count -gt 0 })
+} else {
+    $browsers = @($CONFIG.Browsers)
+}
 if ($browsers.Count -eq 0) {
     Write-Host "[WARN] No browser selected - nothing to do"
     Write-Host "[DONE] Nothing changed"
@@ -154,42 +171,26 @@ foreach ($key in $browsers) {
     }
     Write-Host "[STEP] $step/$total $($def.Name)"
 
-    foreach ($v in $def.Values) {
+    for ($i = 0; $i -lt $def.Values.Count; $i++) {
+        if ($detail.Count -gt 0 -and $detail -notcontains "$key-$i") { continue }
+        $v = $def.Values[$i]
         if ($Disable) {
             $current = (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue).($v.Name)
-            if ($null -ne $current -and [int]$current -eq $v.Off) {
-                Write-Host "[OK]   $($v.Name) already $($v.Off)"
-                continue
-            }
-            if ($SafeTest) {
-                Write-Host "[INFO] SafeTest - would set $($v.Name) = $($v.Off)"
-                continue
-            }
+            if ($null -ne $current -and [int]$current -eq $v.Off) { Write-Host "[OK]   $($v.Name) already $($v.Off)"; continue }
+            if ($SafeTest) { Write-Host "[INFO] SafeTest - would set $(Format-Key $v.Path)\$($v.Name) = $($v.Off)"; continue }
             try {
                 if (-not (Test-Path $v.Path)) { New-Item -Path $v.Path -Force -ErrorAction Stop | Out-Null }
                 Set-ItemProperty -Path $v.Path -Name $v.Name -Value $v.Off -Type DWord -ErrorAction Stop
-                Write-Host "[OK]   $($v.Name) = $($v.Off)"
-            } catch {
-                Write-Host "[ERR]  $($v.Name): $($_.Exception.Message)"
-                $errors++
-            }
+                Write-Host "[OK]   $(Format-Key $v.Path)\$($v.Name) = $($v.Off)"
+            } catch { Write-Host "[ERR]  $($v.Name): $($_.Exception.Message)"; $errors++ }
         } else {
             $exists = $null -ne (Get-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction SilentlyContinue)
-            if (-not $exists) {
-                Write-Host "[OK]   $($v.Name) not set - nothing to remove"
-                continue
-            }
-            if ($SafeTest) {
-                Write-Host "[INFO] SafeTest - would remove $($v.Name)"
-                continue
-            }
+            if (-not $exists) { Write-Host "[OK]   $($v.Name) not set - nothing to remove"; continue }
+            if ($SafeTest) { Write-Host "[INFO] SafeTest - would remove $(Format-Key $v.Path)\$($v.Name)"; continue }
             try {
                 Remove-ItemProperty -Path $v.Path -Name $v.Name -ErrorAction Stop
-                Write-Host "[OK]   $($v.Name) removed"
-            } catch {
-                Write-Host "[ERR]  $($v.Name): $($_.Exception.Message)"
-                $errors++
-            }
+                Write-Host "[OK]   $(Format-Key $v.Path)\$($v.Name) removed"
+            } catch { Write-Host "[ERR]  $($v.Name): $($_.Exception.Message)"; $errors++ }
         }
     }
 }
